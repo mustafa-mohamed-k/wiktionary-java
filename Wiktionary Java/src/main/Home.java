@@ -1,8 +1,22 @@
-
 package main;
 
+import java.awt.Component;
 import org.kordamp.ikonli.carbonicons.CarbonIcons;
 import org.kordamp.ikonli.swing.FontIcon;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.DefaultListModel;
+import javax.swing.JList;
+import javax.swing.JOptionPane;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultStyledDocument;
+import javax.swing.text.Style;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.StyleContext;
 
 /**
  *
@@ -15,35 +29,47 @@ public class Home extends javax.swing.JFrame {
      */
     public Home() {
         initComponents();
-        
+
         int iconSize = 16;
-        
+
         FontIcon fontIcon = FontIcon.of(CarbonIcons.PLAY);
         fontIcon.setIconSize(iconSize);
         jButtonPronunciation.setIcon(fontIcon);
         jButtonPronunciation.setText("");
         jButtonPronunciation.setToolTipText("Pronunciation");
-        
+
         FontIcon iconPrevious = FontIcon.of(CarbonIcons.PREVIOUS_OUTLINE);
         iconPrevious.setIconSize(iconSize);
         jButtonPrevious.setIcon(iconPrevious);
         jButtonPrevious.setToolTipText("Previous search");
         jButtonPrevious.setText("");
-        
+
         FontIcon iconNext = FontIcon.of(CarbonIcons.NEXT_OUTLINE);
         iconNext.setIconSize(iconSize);
         jButtonNext.setIcon(iconNext);
         jButtonNext.setToolTipText("Next search");
         jButtonNext.setText("");
-        
+
         FontIcon iconBookmark = FontIcon.of(CarbonIcons.BOOKMARK);
         iconBookmark.setIconSize(iconSize);
         jButtonBookmark.setIcon(iconBookmark);
         jButtonBookmark.setToolTipText("Bookmark this word");
         jButtonBookmark.setText("");
-        
+
         jTextFieldSearch.putClientProperty("JTextField.placeholderText", "Search");
-        
+
+        jListResults.setCellRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value != null) {
+                    Entry entry = (Entry)value;
+                    setText(String.format("%s (%s)", entry.word, entry.pos));
+                }
+                return this;
+            }
+        });
+
     }
 
     /**
@@ -62,9 +88,18 @@ public class Home extends javax.swing.JFrame {
         jButtonPrevious = new javax.swing.JButton();
         jScrollPane1 = new javax.swing.JScrollPane();
         jTextPane = new javax.swing.JTextPane();
+        jScrollPane2 = new javax.swing.JScrollPane();
+        jListResults = new javax.swing.JList<>();
+        jLabel1 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Wiktionary Java");
+
+        jTextFieldSearch.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jTextFieldSearchActionPerformed(evt);
+            }
+        });
 
         jButtonBookmark.setText("Bookmark");
         jButtonBookmark.setToolTipText("Bookmark current search");
@@ -78,14 +113,30 @@ public class Home extends javax.swing.JFrame {
         jTextPane.setEditable(false);
         jScrollPane1.setViewportView(jTextPane);
 
+        jListResults.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        jListResults.setToolTipText("Select a result to see its definition");
+        jListResults.addListSelectionListener(new javax.swing.event.ListSelectionListener() {
+            public void valueChanged(javax.swing.event.ListSelectionEvent evt) {
+                jListResultsValueChanged(evt);
+            }
+        });
+        jScrollPane2.setViewportView(jListResults);
+
+        jLabel1.setText("Search results");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jScrollPane1)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addGroup(layout.createSequentialGroup()
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 177, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel1))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jScrollPane1))
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(jTextFieldSearch, javax.swing.GroupLayout.DEFAULT_SIZE, 243, Short.MAX_VALUE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -109,7 +160,12 @@ public class Home extends javax.swing.JFrame {
                     .addComponent(jButtonNext)
                     .addComponent(jButtonPrevious))
                 .addGap(18, 18, 18)
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 424, Short.MAX_VALUE)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 424, Short.MAX_VALUE)
+                    .addGroup(layout.createSequentialGroup()
+                        .addComponent(jLabel1)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jScrollPane2)))
                 .addContainerGap())
         );
 
@@ -117,14 +173,251 @@ public class Home extends javax.swing.JFrame {
         setLocationRelativeTo(null);
     }// </editor-fold>//GEN-END:initComponents
 
+    private void jTextFieldSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextFieldSearchActionPerformed
+        search();
+    }//GEN-LAST:event_jTextFieldSearchActionPerformed
+
+    private void jListResultsValueChanged(javax.swing.event.ListSelectionEvent evt) {//GEN-FIRST:event_jListResultsValueChanged
+        if (!evt.getValueIsAdjusting())
+            onSelectionChanged();
+    }//GEN-LAST:event_jListResultsValueChanged
+
+    private void setPronunication(int entryId, DefaultStyledDocument document, Connection conn) throws SQLException, BadLocationException {
+        String sql = "SELECT * FROM sound WHERE entry_id = ?";
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        stmt.setInt(1, entryId);
+        ResultSet rs = stmt.executeQuery();
+        String text = "Pronunciation: ";
+        List<String> texts = new ArrayList<>();
+        while (rs.next()) {
+            String ipa = rs.getString("ipa");
+            //String enpr = rs.getString("enpr");
+            //String audio = rs.getString("audio");
+            //String oggUrl = rs.getString("ogg_url");
+            //String mp3Url = rs.getString("mp3_url");
+            String tags = rs.getString("tags");
+
+            if ((ipa == null || ipa.isBlank()) && (tags == null || tags.isBlank())) {
+                continue;
+            }
+
+            texts.add((ipa == null ? "" : (ipa + " "))
+                    + (tags == null ? "" : ("(" + tags + ")")));
+        }
+
+        text += String.join(", ", texts);
+
+        document.insertString(document.getLength(), text, null);
+
+    }
+
+    private void setAltOfs(int senseId, DefaultStyledDocument document, Connection conn) throws SQLException, BadLocationException {
+        String sql = "SELECT * FROM alt_of WHERE sense_id = ? ";
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        stmt.setInt(1, senseId);
+        ResultSet rs = stmt.executeQuery();
+        List<String> texts = new ArrayList<>();
+        while (rs.next()) {
+            String word = rs.getString("word");
+            String extra = rs.getString("extra");
+            if ((word == null || word.isBlank()) && (extra == null || extra.isBlank())) {
+                continue;
+            }
+            texts.add(word + ((extra == null || extra.isBlank()) ? "" : ("-" + extra)));
+        }
+        if (!texts.isEmpty()) {
+
+            StyleContext context = new StyleContext();
+
+            Style bold = context.addStyle("bold", null);
+            StyleConstants.setBold(bold, true);
+
+            String text = "\nAlternative forms";
+            document.insertString(document.getLength(), text, bold);
+            document.insertString(document.getLength(), "\n", null);
+
+            int i = 1;
+            for (String t : texts) {
+                document.insertString(document.getLength(), String.format("%d. %s\n", i, t), null);;
+                i += 1;
+            }
+        }
+    }
+
+    private void setEtymologyText(int entryId, DefaultStyledDocument document, Connection conn) throws SQLException, BadLocationException {
+        String sql = "SELECT etymology_text FROM `entry` WHERE id = ? ";
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        stmt.setInt(1, entryId);
+        ResultSet rs = stmt.executeQuery();
+        if (rs.next()) {
+
+            if (rs.getString(1) != null) {
+                StyleContext context = new StyleContext();
+
+                Style bold = context.addStyle("bold", null);
+                StyleConstants.setBold(bold, true);
+
+                document.insertString(document.getLength(), "\n\nEtymology: ", bold);
+                document.insertString(document.getLength(), rs.getString(1) + "\n", null);
+            }
+
+        }
+    }
+
+    private List<Integer> getSenseIds(int entryId, Connection conn) throws SQLException {
+        String sql = "SELECT id FROM sense WHERE entry_id = ? ";
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        stmt.setInt(1, entryId);
+        ResultSet rs = stmt.executeQuery();
+        List<Integer> ids = new ArrayList<>();
+        while (rs.next()) {
+            ids.add(rs.getInt(1));
+        }
+        return ids;
+    }
+
+    private void setRawGloss(int senseId, int count, DefaultStyledDocument document, Connection conn) throws SQLException, BadLocationException {
+        String sql = "select * from raw_gloss where sense_id = ?";
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        stmt.setInt(1, senseId);
+        ResultSet rs = stmt.executeQuery();
+        List<String> glosses = new ArrayList<>();
+        while (rs.next()) {
+            String rawGloss = rs.getString("raw_gloss");
+            if (rawGloss != null && !rawGloss.isBlank()) {
+                glosses.add(rawGloss);
+            }
+        }
+        if (!glosses.isEmpty()) {
+            
+            for (String gloss: glosses){
+                String text = String.format("%d. %s\n", count, gloss);
+                document.insertString(document.getLength(), text, null);
+            }
+        }
+    }
+
+    private void setGloss(int senseId, int count, DefaultStyledDocument document, Connection conn) throws SQLException, BadLocationException {
+        String sql = "select * from gloss where sense_id = ?";
+        PreparedStatement stmt = conn.prepareStatement(sql);
+        stmt.setInt(1, senseId);
+        ResultSet rs = stmt.executeQuery();
+        List<String> glosses = new ArrayList<>();
+        while (rs.next()) {
+            String rawGloss = rs.getString("gloss");
+            if (rawGloss != null && !rawGloss.isBlank()) {
+                glosses.add(rawGloss);
+            }
+        }
+        if (!glosses.isEmpty()) {
+            
+            for (String gloss: glosses){
+                String text = String.format("%d. %s\n", count, gloss);
+                document.insertString(document.getLength(), text, null);
+            }
+        }
+    }
     
+    private Style getBoldStyle() {
+        StyleContext context = new StyleContext();
+        Style bold = context.addStyle("bold", null);
+        StyleConstants.setBold(bold, true);
+        return bold;
+    }
+
+    private void onSelectionChanged() {
+        if (jListResults.getSelectedIndices().length == 1) {
+            Entry selection = jListResults.getSelectedValue();
+            String sql = "SELECT * FROM entry WHERE id = ? ";
+            try (Connection conn = Database.getConnection()) {
+                PreparedStatement stmt = conn.prepareStatement(sql);
+                stmt.setInt(1, selection.id);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    DefaultStyledDocument document = new DefaultStyledDocument();
+
+                    StyleContext context = new StyleContext();
+
+                    Style bold = context.addStyle("bold", null);
+                    StyleConstants.setBold(bold, true);
+
+                    Style italic = context.addStyle("italic", null);
+                    StyleConstants.setItalic(italic, true);
+
+                    final int entryId = selection.id;
+                    final List<Integer> senseIds = getSenseIds(entryId, conn);
+                    final String word = selection.word;
+
+                    try {
+                        document.insertString(0, selection.word + "\n", italic);
+                        document.insertString(document.getLength(), selection.pos, bold);
+                        document.insertString(document.getLength(), "\n", null);
+
+                        setPronunication(selection.id, document, conn);
+
+                        setEtymologyText(selection.id, document, conn);
+                        //System.out.println("entry id: " + selection.id);
+                        
+                        int senseNumber = 1;
+                        document.insertString(document.getLength(), "\n", null);
+                        for (int senseId : senseIds) {
+                            //System.out.println("sense id: " + senseId);
+                            setAltOfs(senseId, document, conn);
+                            
+                            setGloss(senseId, senseNumber++, document, conn);
+                        }
+
+                    } catch (BadLocationException ex) {
+                        Logger.getLogger(Home.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+
+                    jTextPane.setDocument(document);
+                }
+            } catch (SQLException | ClassNotFoundException ex) {
+                Logger.getLogger(Home.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+
+    private void search() {
+        String text = jTextFieldSearch.getText().trim();
+        if (text.isBlank()) {
+            return;
+        }
+        DefaultListModel<Entry> model = new DefaultListModel();
+        String sql = "SELECT * FROM entry WHERE word LIKE ? ORDER BY word ASC ";
+        try (Connection conn = Database.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, "%" + text + "%");
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                Entry entry = new Entry();
+                entry.word = rs.getString("word");
+                entry.id = rs.getInt("id");
+                entry.pos = rs.getString("pos");
+                entry.lang = rs.getString("lang");
+                entry.langCode = rs.getString("lang_code");
+                entry.etymologyText = rs.getString("etymology_text");
+                model.addElement(entry);
+            }
+        } catch (ClassNotFoundException | SQLException ex) {
+            Logger.getLogger(Home.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this, "An error occurred: " + ex.getMessage(), "Error", JOptionPane.WARNING_MESSAGE);
+        } finally {
+            jListResults.setModel(model);
+        }
+    }
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButtonBookmark;
     private javax.swing.JButton jButtonNext;
     private javax.swing.JButton jButtonPrevious;
     private javax.swing.JButton jButtonPronunciation;
+    private javax.swing.JLabel jLabel1;
+    private javax.swing.JList<Entry> jListResults;
     private javax.swing.JScrollPane jScrollPane1;
+    private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JTextField jTextFieldSearch;
     private javax.swing.JTextPane jTextPane;
     // End of variables declaration//GEN-END:variables
