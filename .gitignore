@@ -30,3 +30,9 @@ venv/
 # database files, they're ignored simply because they are large files
 kaikki.org-dictionary-English.json
 dictionary.sqlite
+
+# NetBeans stuff
+
+/Wiktionary Java/nbproject/private/
+/Wiktionary Java/build/
+/Wiktionary Java/dist/
