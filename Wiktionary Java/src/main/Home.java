@@ -63,7 +63,7 @@ public class Home extends javax.swing.JFrame {
             public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 if (value != null) {
-                    Entry entry = (Entry)value;
+                    Entry entry = (Entry) value;
                     setText(String.format("%s (%s)", entry.word, entry.pos));
                 }
                 return this;
@@ -289,8 +289,8 @@ public class Home extends javax.swing.JFrame {
             }
         }
         if (!glosses.isEmpty()) {
-            
-            for (String gloss: glosses){
+
+            for (String gloss : glosses) {
                 String text = String.format("%d. %s\n", count, gloss);
                 document.insertString(document.getLength(), text, null);
             }
@@ -310,18 +310,122 @@ public class Home extends javax.swing.JFrame {
             }
         }
         if (!glosses.isEmpty()) {
-            
-            for (String gloss: glosses){
+
+            for (String gloss : glosses) {
                 String text = String.format("%d. %s\n", count, gloss);
                 document.insertString(document.getLength(), text, null);
             }
         }
     }
-    
+
+    private void setGlossesAndExamples(int entryId, DefaultStyledDocument document, Connection conn) throws SQLException, BadLocationException {
+        String sql = "SELECT id AS senseId FROM sense WHERE entry_id = ?";
+        PreparedStatement statement = conn.prepareStatement(sql);
+        statement.setInt(1, entryId);
+        ResultSet resultSet = statement.executeQuery();
+
+        sql = "SELECT raw_gloss FROM raw_gloss WHERE sense_id = ?";
+        PreparedStatement rawGlossStmt = conn.prepareStatement(sql);
+
+        sql = "SELECT gloss FROM gloss WHERE sense_id = ?";
+        PreparedStatement glossStmt = conn.prepareStatement(sql);
+
+        sql = "SELECT sense, tags, word FROM synonym WHERE sense_id = ?";
+        PreparedStatement synonymStmt = conn.prepareStatement(sql);
+
+        sql = "SELECT `text`, `ref`, `type` FROM example WHERE sense_id = ?";
+        PreparedStatement exampleStmt = conn.prepareStatement(sql);
+
+        ResultSet rawGlossRs, glossRs, synonymRs, exampleRs;
+
+        int count = 1;
+        while (resultSet.next()) {
+            // prefer rawGloss if both rawGloss and gloss are available, otherwise use gloss
+            int senseId = resultSet.getInt(1);
+            String rawGloss = null, gloss = null;
+
+            rawGlossStmt.setInt(1, senseId);
+            rawGlossRs = rawGlossStmt.executeQuery();
+            if (rawGlossRs.next()) {
+                rawGloss = rawGlossRs.getString(1);
+            }
+
+            glossStmt.setInt(1, senseId);
+            glossRs = glossStmt.executeQuery();
+            if (glossRs.next()) {
+                gloss = glossRs.getString(1);
+            }
+
+            String preferredGloss = (rawGloss == null || rawGloss.isBlank()) ? gloss : rawGloss;
+
+            // get synonyms
+            List<String> synonyms = new ArrayList<>();
+            synonymStmt.setInt(1, senseId);
+            synonymRs = synonymStmt.executeQuery();
+            while (synonymRs.next()) {
+                //String sense = synonymRs.getString(1);
+                String tags = synonymRs.getString(2);
+                String word = synonymRs.getString(3);
+
+                if (word != null && !word.isBlank()) {
+                    synonyms.add(
+                            word + ((tags == null || tags.isBlank()) ? "" : ("(" + tags + ")"))
+                    );
+                }
+            }
+
+            // get examples
+            List<String> examples = new ArrayList<>();
+            exampleStmt.setInt(1, senseId);
+            exampleRs = exampleStmt.executeQuery();
+            while (exampleRs.next()) {
+                String text = exampleRs.getString(1);
+                String ref = exampleRs.getString(2);
+                //String type = exampleRs.getString(3);
+
+                if (text != null) {
+                    examples.add(
+                            text + ((ref == null || ref.isBlank()) ? "" : ("(From " + ref + ")")));
+                }
+            }
+
+            // add the stuff to the document
+            // add the definition
+            document.insertString(document.getLength(), String.format("\n%d. %s\n", count, preferredGloss), null);
+
+            // add synonyms
+            if (!synonyms.isEmpty()) {
+                document.insertString(document.getLength(), "Synonyms: " + String.join(", ", synonyms) + "\n", null);
+            }
+
+            // add examples
+            if (!examples.isEmpty()) {
+                document.insertString(document.getLength(), "Examples:\n", null);
+                //Style italicStyle = getItalicStyle();
+                int exampleCount = 1;
+                for (String example : examples) {
+                    document.insertString(document.getLength(), 
+                            String.format("%d. %s\n", exampleCount++, example), 
+                            getItalicStyle());
+                }
+                document.insertString(document.getLength(), "\n", null);
+            }
+
+            count += 1;
+        }
+    }
+
     private Style getBoldStyle() {
         StyleContext context = new StyleContext();
         Style bold = context.addStyle("bold", null);
         StyleConstants.setBold(bold, true);
+        return bold;
+    }
+    
+    private Style getItalicStyle(){
+        StyleContext context = new StyleContext();
+        Style bold = context.addStyle("bold", null);
+        StyleConstants.setItalic(bold, true);
         return bold;
     }
 
@@ -356,16 +460,12 @@ public class Home extends javax.swing.JFrame {
                         setPronunication(selection.id, document, conn);
 
                         setEtymologyText(selection.id, document, conn);
-                        //System.out.println("entry id: " + selection.id);
-                        
-                        int senseNumber = 1;
+
                         document.insertString(document.getLength(), "\n", null);
                         for (int senseId : senseIds) {
-                            //System.out.println("sense id: " + senseId);
                             setAltOfs(senseId, document, conn);
-                            
-                            setGloss(senseId, senseNumber++, document, conn);
                         }
+                        setGlossesAndExamples(entryId, document, conn);
 
                     } catch (BadLocationException ex) {
                         Logger.getLogger(Home.class.getName()).log(Level.SEVERE, null, ex);
