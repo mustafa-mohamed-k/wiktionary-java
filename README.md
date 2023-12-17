@@ -2,6 +2,9 @@
 
 An offline dictionary based on Wiktionary.<br/>
 
+## Screenshots
+![image](https://github.com/mustafa-mohamed-k/wiktionary-java/assets/66688103/0afe25a6-dcbf-440b-a559-5a694dc5607e)
+
 
 ## Building the database file
 The database file is an SQLite file built by reading the .json file found at [Large JSON file with word senses - > 1GB](https://kaikki.org/dictionary/English/kaikki.org-dictionary-English.json).<br/>
